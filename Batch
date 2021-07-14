@@ -1,0 +1,16 @@
+df = spark.sql("SELECT MAX(cadastro), MAX(atualizacao) FROM projetobatch")
+c = df.collect()[0][0]
+d = df.collect()[0][1]
+
+pushdown_query = "(SELECT * FROM projeto WHERE cadastro > '{}' OR atualizacao > '{}' ) query_alias".format(c,d)
+dfquery = spark.read.jdbc(url=jdbcUrl, table=pushdown_query, properties=connectionProperties)
+dfquery.createOrReplaceTempView("dfquery")
+
+spark.sql("""
+MERGE INTO projetobatch AS t 
+USING dfquery AS s
+ON s.id = t.id
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *""")
+
+display(spark.table("projetobatch").orderBy('id'))
